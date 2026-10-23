@@ -7,6 +7,7 @@
 	- Converted screens and gameplay to frame-stepped states shared by native and browser builds.
 	- Added a Blender-rendered vintage Macintosh browser intro with a Nanosaur CRT splash, live segmented download progress, responsive screen placement, automatic game startup, optional sound/fullscreen activation, and a chrome-free, full-window view.
 	- Added explicit Pomme dependency preparation.
+	- Added GitHub Actions web builds.
 
 - **v1.4.4 (Feb. 5, 2023)**
 	- Fixed physics for very high framerates
