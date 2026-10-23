@@ -90,7 +90,7 @@ else:
     help_build = "build binary"
     help_package = "package up the game into an AppImage"
 
-parser.add_argument("-1", "--dependencies", default=False, action="store_true", help="step 1: fetch and set up dependencies (SDL)")
+parser.add_argument("-1", "--dependencies", default=False, action="store_true", help="step 1: fetch and set up dependencies (Pomme and SDL)")
 parser.add_argument("-2", "--configure", default=False, action="store_true", help=f"step 2: {help_configure}")
 parser.add_argument("-3", "--build", default=False, action="store_true", help=f"step 3: {help_build}")
 parser.add_argument("-4", "--package", default=False, action="store_true", help=f"step 4: {help_package}")
@@ -477,10 +477,7 @@ if __name__ == "__main__":
     if args.dependencies:
         fatlog("Setting up dependencies")
 
-        # Check that our submodules are here
-        if not os.path.exists("extern/Pomme/CMakeLists.txt"):
-            die("Submodules appear to be missing.\n"
-                + "Did you clone the submodules recursively? Try this:    git submodule update --init --recursive")
+        call([sys.executable, os.path.join(root_dir, "prepare_dependencies.py")])
 
         project.prepare_dependencies()
 
