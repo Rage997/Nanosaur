@@ -3,4 +3,4 @@
 //
 
 
-extern	void DoMainMenu(void);
+bool DoMainMenu(void);

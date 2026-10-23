@@ -16,9 +16,7 @@
 /****************************/
 
 static void MakeMainMenuModels(void);
-static void SpinMainMenuIcons(float delta);
-static void SpinToPreviousMainMenuIcon(void);
-static void SpinToNextMainMenuIcon(void);
+static bool SpinMainMenuIcons(float delta);
 static void MoveFallingEgg(ObjNode *theNode);
 static void GenerateFallingEgg(void);
 static void MoveMenuBG(ObjNode *theNode);
@@ -72,13 +70,16 @@ static	float		gWheelCenterZ;
 
 
 /************************* DO MAIN MENU ****************************/
-void DoMainMenu(void)
+bool DoMainMenu(void)
 {
+	static enum { MenuSetup, MenuRun, MenuSpin, MenuFade, MenuChild } state;
+	static float spinDirection;
+	if (state == MenuSetup)
+	{
 FSSpec	file;
 QD3DSetupInputType	viewDef;
 TQ3Point3D			cameraFrom = { 0, 00, 600.0 };
 
-do_again:
 
 	MakeFadeEvent(true);
 
@@ -140,83 +141,87 @@ do_again:
 
 			/* INIT DEMO TIMER */
 
-	QD3D_CalcFramesPerSecond();
+	state = MenuRun;
+	}
 
 				/*************/
 				/* MAIN LOOP */
 				/*************/
 				
-	do
+	if (state == MenuRun)
 	{
 				/* UPDATE FRAME */
 				
 		GenerateFallingEgg();
 		MoveObjects();
 		QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);
-		QD3D_CalcFramesPerSecond();					
 		
 				/* CHECK FOR KEY INPUT */
 
 		UpdateInput();
 
-		if (GetNewNeedState(kNeed_UIConfirm))								// see if select
-			break;
-
-		if (GetNewNeedState(kNeed_UILeft))									// spin left
+		if (GetNewNeedState(kNeed_UIConfirm))
+			state = MenuFade;
+		else if (GetNewNeedState(kNeed_UILeft))
 		{
-			if (gCurrentSelection == 0)
-				gCurrentSelection = NUM_MAINMENU_ICONS-1;
-			else
-				gCurrentSelection--;
-			SpinToPreviousMainMenuIcon();
+			gCurrentSelection = (gCurrentSelection + NUM_MAINMENU_ICONS-1) % NUM_MAINMENU_ICONS;
+			spinDirection = 1;
+			state = MenuSpin;
 		}
-		else
-		if (GetNewNeedState(kNeed_UIRight))									// spin right
+		else if (GetNewNeedState(kNeed_UIRight))
 		{
-			if (++gCurrentSelection >= NUM_MAINMENU_ICONS)
-				gCurrentSelection = 0;
-			SpinToNextMainMenuIcon();
+			gCurrentSelection = (gCurrentSelection+1) % NUM_MAINMENU_ICONS;
+			spinDirection = -1;
+			state = MenuSpin;
 		}
-	}while(true);
+		return false;
+	}
 
-	QD3D_CalcFramesPerSecond();		// call this to prime data for demo playback/record
+	if (state == MenuSpin)
+	{
+		if (SpinMainMenuIcons(spinDirection)) state = MenuRun;
+		return false;
+	}
 
 
 		/***********/
 		/* CLEANUP */
 		/***********/
 
-	Render_FreezeFrameFadeOut();
+	if (state == MenuFade)
+	{
+	if (!Render_FreezeFrameFadeOut()) return false;
 		
 	DeleteAllObjects();
 	DeleteAll3DMFGroups();
 	FreeAllSkeletonFiles(-1);
 	QD3D_DisposeWindowSetup(&gGameViewInfoPtr);
+	state = MenuChild;
+	}
 
 
 			/* HANDLE SELECTION */
 	
-	switch(gCurrentSelection)
+	switch (gCurrentSelection)
 	{
-		case	0:							// play
-				return;
-
-		case	1:							// settings
-				DoSettingsScreen();
-				goto do_again;
-
-		case	2:							// HELP
-				ShowHelp();
-				goto do_again;
-
-		case	3:							// quit
-				CleanQuit();
-				return;
-
-		case	4:							// high scores
-				ShowHighScoresScreen(0);
-				goto do_again;
+		case 0:
+			state = MenuSetup;
+			return true;
+		case 1:
+			if (!DoSettingsScreen()) return false;
+			break;
+		case 2:
+			if (!ShowHelp()) return false;
+			break;
+		case 3:
+			CleanQuit();
+			break;
+		case 4:
+			if (!ShowHighScoresScreen(0)) return false;
+			break;
 	}
+	state = MenuSetup;
+	return false;
 }
 
 
@@ -326,28 +331,6 @@ float	r;
 }
 
 
-/****************** SPIN TO PREVIOUS MAIN MENU ICON ************************/
-//
-// Spins all the icons counter clockwise until they're in the right position.
-//
-
-static void SpinToPreviousMainMenuIcon(void)
-{
-	SpinMainMenuIcons(1.0f);
-}
-
-
-/****************** SPIN TO NEXT MAIN MENU ICON ************************/
-//
-// Spins all the icons clockwise until they're in the right position.
-//
-
-static void SpinToNextMainMenuIcon(void)
-{
-	SpinMainMenuIcons(-1.0f);
-}
-
-
 /****************** SPIN MAIN MENU ICONS ************************/
 // Spins all the icons until they're in the right position.
 // Pass in 1.0f as delta to spin counter-clockwise; -1.0f to spin clockwise.
@@ -355,18 +338,19 @@ static void SpinToNextMainMenuIcon(void)
 // Source port refactor. The original game would also spin one loop
 // iteration too far, which is fixed.
 
-static void SpinMainMenuIcons(float delta)
+static bool SpinMainMenuIcons(float delta)
 {
-float	targetRot,r;
-Byte	i;
-Boolean	stop;
-
-	PlayEffect(EFFECT_MENUCHANGE);										// play sound
-
-	targetRot = gMainMenuWheelRot + delta * (PI2 / NUM_MAINMENU_ICONS);	// calc target rotation
-	stop = false;
-
-	do
+	static bool active;
+	static float targetRot;
+	if (!active)
+	{
+		PlayEffect(EFFECT_MENUCHANGE);
+		targetRot = gMainMenuWheelRot + delta * (PI2 / NUM_MAINMENU_ICONS);
+		active = true;
+	}
+	float r;
+	Byte i;
+	Boolean stop = false;
 	{
 		gMainMenuWheelRot += delta * SPIN_SPEED * gFramesPerSecondFrac;
 		if ((delta < 0 && gMainMenuWheelRot < targetRot) ||
@@ -391,12 +375,15 @@ Boolean	stop;
 	
 				/* UPDATE FRAME */
 				
-		QD3D_CalcFramesPerSecond();					
+		DoSoundMaintenance();
 		MoveObjects();
 		QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);
 		UpdateInput();
 
-	} while (!stop);
+	}
+	if (!stop) return false;
+	active = false;
+	return true;
 }
 
 

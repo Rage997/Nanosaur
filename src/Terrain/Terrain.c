@@ -12,7 +12,7 @@
 #include "game.h"
 
 #define TILE_TEXTURE_INTERNAL_FORMAT	GL_RGB
-#define TILE_TEXTURE_FORMAT				GL_BGRA_EXT
+#define TILE_TEXTURE_FORMAT				GL_BGRA
 #define TILE_TEXTURE_TYPE				GL_UNSIGNED_SHORT_1_5_5_5_REV
 
 
@@ -245,6 +245,7 @@ void DisposeTerrain(void)
 
 			if (superTile->triMeshPtr)
 			{
+				RenderWeb_ReleaseMesh(superTile->triMeshPtr);
 				Q3TriMeshData_Dispose(superTile->triMeshPtr);
 				superTile->triMeshPtr = nil;
 			}
@@ -252,6 +253,7 @@ void DisposeTerrain(void)
 #if !(HQ_TERRAIN)
 			if (superTile->triMeshPtr2)
 			{
+				RenderWeb_ReleaseMesh(superTile->triMeshPtr2);
 				Q3TriMeshData_Dispose(superTile->triMeshPtr2);
 				superTile->triMeshPtr2 = nil;
 			}
@@ -765,6 +767,7 @@ SuperTileMemoryType	*superTilePtr;
 
 	triMeshPtr = gSuperTileMemoryList[superTileNum].triMeshPtr;					// get the triMesh
 	GAME_ASSERT(triMeshPtr);
+	RenderWeb_InvalidateMesh(triMeshPtr, kWebMeshGeometry | kWebMeshTopology);
 
 	pointList = triMeshPtr->points;												// get ptr to point/vertex list
 	triangleList = triMeshPtr->triangles;										// get ptr to triangle index list
@@ -984,6 +987,10 @@ static void UpdateSuperTileTexture(SuperTileMemoryType* superTilePtr)
 			/* RECREATE TEXTURE */
 
 	Render_BindTexture(superTilePtr->glTextureName);
+#ifdef __EMSCRIPTEN__
+	RenderWeb_UploadTexture(false, GL_RGB, 0, 0, SUPERTILE_TEXMAP_SIZE, SUPERTILE_TEXMAP_SIZE,
+		TILE_TEXTURE_FORMAT, TILE_TEXTURE_TYPE, textureData, 0);
+#else
 	glTexSubImage2D(
 			GL_TEXTURE_2D,
 			0,
@@ -995,6 +1002,7 @@ static void UpdateSuperTileTexture(SuperTileMemoryType* superTilePtr)
 			TILE_TEXTURE_TYPE,
 			textureData);
 	CHECK_GL_ERROR();
+#endif
 }
 
 

@@ -1,7 +1,16 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+// Source pixel layouts used by the asset loaders; converted before WebGL uploads.
+#define GL_BGRA 0x80E1
+#define GL_UNSIGNED_SHORT_1_5_5_5_REV 0x8366
+#define GL_UNSIGNED_INT_8_8_8_8 0x8035
+#define GL_UNSIGNED_INT_8_8_8_8_REV 0x8367
+#else
 #include <SDL3/SDL_opengl.h>
+#endif
 #include <Pomme.h>
 #include <QD3D.h>
 #include <QD3DMath.h>
@@ -48,6 +57,7 @@ extern "C"
 #include "player_control.h"
 #include "qd3d_geometry.h"
 #include "renderer.h"
+#include "rendererweb.h"
 #include "skeletonanim.h"
 #include "skeletonjoints.h"
 #include "skeletonobj.h"

@@ -10,6 +10,9 @@
 /***************/
 
 #include "game.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 
 /****************************/
@@ -488,6 +491,9 @@ long				count;
 	count = sizeof(PrefsType);
 	FSWrite(refNum, &count, (Ptr)prefs);	
 	FSClose(refNum);
+#ifdef __EMSCRIPTEN__
+	EM_ASM({ Module['persist'](); });
+#endif
 }
 
 

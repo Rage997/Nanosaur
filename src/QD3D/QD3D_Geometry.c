@@ -149,7 +149,7 @@ void QD3D_DisposeShards(void)
 		ShardType* shard = &gShardMemory[i];
 		if (shard->mesh)
 		{
-			Q3TriMeshData_Dispose(shard->mesh);
+			{ RenderWeb_ReleaseMesh(shard->mesh); Q3TriMeshData_Dispose(shard->mesh); }
 			shard->mesh = nil;
 		}
 	}
@@ -219,6 +219,7 @@ TQ3Point3D			centerPt = {0,0,0};
 
 		ShardType* shard = &gShardMemory[shardIndex];
 		TQ3TriMeshData* sMesh = shard->mesh;
+		RenderWeb_InvalidateMesh(sMesh, kWebMeshAll);
 
 		const uint32_t* ind = inMesh->triangles[t].pointIndices;						// get indices of 3 points
 
@@ -440,6 +441,7 @@ void QD3D_ScrollUVs(int numMeshes, TQ3TriMeshData** meshList, float rawDeltaU, f
 			continue;
 
 		GAME_ASSERT(mesh->vertexUVs);
+		RenderWeb_InvalidateMesh(mesh, kWebMeshAttributes);
 
 		for (int j = 0; j < mesh->numPoints; j++)
 		{

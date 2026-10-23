@@ -18,7 +18,9 @@ static const int kNumKeybindingRows = NUM_REMAPPABLE_NEEDS + 2;  // +2 extra row
 static const int kKeybindingRow_Reset = NUM_REMAPPABLE_NEEDS + 0;
 static const int kKeybindingRow_Done = NUM_REMAPPABLE_NEEDS + 1;
 
+#ifndef __EMSCRIPTEN__
 static bool gShowAntialiasingWarning = false;
+#endif
 
 
 enum
@@ -45,9 +47,11 @@ typedef struct SettingEntry
 static void Callback_EnterControls(void);
 static void Callback_Difficulty(void);
 static void Callback_Music(void);
+#ifndef __EMSCRIPTEN__
 static void Callback_Fullscreen(void);
 static void Callback_VSync(void);
 static void Callback_Antialiasing(void);
+#endif
 static void Callback_DebugInfo(void);
 static void Callback_Done(void);
 
@@ -62,11 +66,15 @@ static SettingEntry gSettingEntries[] =
 	{&gGamePrefs.music				, "Music"				, Callback_Music,			2,	{ "NO", "YES" }, },
 	{&gGamePrefs.ambientSounds		, "Ambient Sounds"		, nil,						2,	{ "NO", "YES" }, },
 	{nil							, nil					, nil,						0,  { NULL } },
+#ifndef __EMSCRIPTEN__
 	{&gGamePrefs.fullscreen			, "Fullscreen"			, Callback_Fullscreen,		2,	{ "NO", "YES" }, },
 	{&gGamePrefs.vsync				, "V-Sync"				, Callback_VSync,			2,	{ "NO", "YES" }, },
+#endif
 	{&gGamePrefs.force4x3			, "Aspect Ratio"		, NULL,						2,	{ "FILL SCREEN", "FORCE 4:3" }, },
+#ifndef __EMSCRIPTEN__
 	{&gGamePrefs.displayNum			, "Preferred Display"	, Callback_Fullscreen,		1,	{ "DEFAULT" }, },
 	{&gGamePrefs.antialiasingLevel	, "Antialiasing"		, Callback_Antialiasing,	4,	{ "NO", "MSAA 2x", "MSAA 4x", "MSAA 8x" }, },
+#endif
 	{nil							, nil					, nil,						0,  { NULL } },
 	{&gGamePrefs.highQualityTextures, "Texture Filtering"	, nil,						2,	{ "NO", "YES" }, },
 	{&gGamePrefs.canDoFog			, "Fog"					, nil,						2,	{ "NO", "YES" }, },
@@ -151,6 +159,7 @@ static void Callback_Music(void)
 		PlaySong(1, true);
 }
 
+#ifndef __EMSCRIPTEN__
 static void Callback_Fullscreen(void)
 {
 	SetFullscreenMode(true);
@@ -165,6 +174,7 @@ static void Callback_Antialiasing(void)
 {
 	gShowAntialiasingWarning = true;
 }
+#endif
 
 static void Callback_DebugInfo(void)
 {
@@ -265,11 +275,13 @@ static void DrawSettingsPage(void)
 		RGBForeColor2(kTitleColor);
 		DrawStringC(title);
 
+#ifndef __EMSCRIPTEN__
 		if (gShowAntialiasingWarning)
 		{
 			RGBForeColor2(0xFFFF9900);
 			MoveTo(80, 480 - 4); DrawStringC("The new antialiasing level will take effect when you restart the game.");
 		}
+#endif
 	}
 
 	for (int i = 0; i < numSettingEntries; i++)
@@ -556,8 +568,12 @@ static void InitDisplayPref(void)
 	}
 }
 
-void DoSettingsScreen(void)
+bool DoSettingsScreen(void)
 {
+	static enum { SettingsSetup, SettingsRun, SettingsFade } state;
+	static float gamma;
+	if (state == SettingsSetup)
+	{
 	Render_InitState();
 	Render_AllocBackdrop(GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT);
 
@@ -574,11 +590,10 @@ void DoSettingsScreen(void)
 
 	InitDisplayPref();
 
-	float gamma = 0;
-
-	QD3D_CalcFramesPerSecond();
-
-	while (gSettingsState != kSettingsState_Off)
+	gamma = 0;
+	state = SettingsRun;
+	}
+	if (state == SettingsRun)
 	{
 		UpdateInput();
 		switch (gSettingsState)
@@ -622,7 +637,6 @@ void DoSettingsScreen(void)
 				break;
 		}
 
-		QD3D_CalcFramesPerSecond();
 		DoSoundMaintenance();
 
 		Render_StartFrame();
@@ -630,10 +644,12 @@ void DoSettingsScreen(void)
 		Render_EndFrame();
 
 		SDL_GL_SwapWindow(gSDLWindow);
+		if (gSettingsState != kSettingsState_Off) return false;
+		SavePrefs(&gGamePrefs);
+		state = SettingsFade;
 	}
-
-	SavePrefs(&gGamePrefs);
-
-	Render_FreezeFrameFadeOut();
+	if (!Render_FreezeFrameFadeOut()) return false;
 	Render_DisposeBackdrop();
+	state = SettingsSetup;
+	return true;
 }

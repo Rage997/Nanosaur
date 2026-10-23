@@ -302,6 +302,8 @@ short	i,j,numAnims,numJoints;
 
 	if (skeleton->associated3DMF)
 	{
+		for (int m = 0; m < skeleton->associated3DMF->numMeshes; m++)
+			RenderWeb_ReleaseMesh(skeleton->associated3DMF->meshes[m]);
 		Q3MetaFile_Dispose(skeleton->associated3DMF);
 		skeleton->associated3DMF = nil;
 	}

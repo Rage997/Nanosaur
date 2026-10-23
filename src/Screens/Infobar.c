@@ -364,12 +364,15 @@ TQ3Matrix4x4	matrix,matrix2,matrix3;
 
 /************************ DO PAUSED ******************************/
 
-void DoPaused(void)
+bool DoPaused(void)
 {
-ObjNode	*resume,*quit;
-Byte	selected = 0;
-float	fluc = 0;
-
+	static ObjNode *resume, *quit;
+	static Byte selected;
+	static float fluc;
+	if (!gGamePaused)
+	{
+	selected = 0;
+	fluc = 0;
 	gGamePaused = true;
 
 	PauseAllChannels(true);
@@ -402,9 +405,8 @@ float	fluc = 0;
 			/* MAIN LOOP */
 			/*************/
 			
-	do
+	}
 	{
-		QD3D_CalcFramesPerSecond();					// calc frame rate				
 		
 				/* SEE IF CHANGE SELECT */
 				
@@ -427,12 +429,8 @@ float	fluc = 0;
 			PlayEffect(EFFECT_SELECT);
 		}
 
-		if (GetNewNeedState(kNeed_UIPause) || GetNewNeedState(kNeed_UIBack))					// ESC does quick un-pause
-		{
-			selected = 0;
-			break;
-		}
-	
+		bool quickResume = GetNewNeedState(kNeed_UIPause) || GetNewNeedState(kNeed_UIBack);
+		if (quickResume) selected = 0;
 				/* FLUCTUATE SELECTED */
 						
 		fluc += gFramesPerSecondFrac * 8;
@@ -452,8 +450,8 @@ float	fluc = 0;
 			MoveGPS(gGPSObj);		// force GPS in upper-right corner even if window gets resized
 
 		QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
+		if (!quickResume && !GetNewNeedState(kNeed_UIConfirm)) return false;
 	}
-	while (!GetNewNeedState(kNeed_UIConfirm));					// see if select
 
 			/* CLEANUP */
 			
@@ -467,6 +465,7 @@ float	fluc = 0;
 	{
 		gGameOverFlag = true;
 	}
+	return true;
 }
 
 
@@ -772,6 +771,10 @@ Boolean					forceUpdate = false;
 				/**********************/
 
 		Render_BindTexture(gGPSObj->MeshList[0]->glTextureName);
+#ifdef __EMSCRIPTEN__
+		RenderWeb_UploadTexture(false, GL_RGB, 0, 0, GPS_MAP_TEXTURE_SIZE, GPS_MAP_TEXTURE_SIZE,
+			GL_BGRA, GL_UNSIGNED_INT_8_8_8_8, GetPixBaseAddr(GetGWorldPixMap(gGPSGWorld)), 0);
+#else
 		glTexSubImage2D(
 				GL_TEXTURE_2D,
 				0,
@@ -787,6 +790,7 @@ Boolean					forceUpdate = false;
 #endif
 				GetPixBaseAddr(GetGWorldPixMap(gGPSGWorld)));
 		CHECK_GL_ERROR();
+#endif
 
 
 		gOldGPSCoordX = x;

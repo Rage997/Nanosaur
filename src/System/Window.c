@@ -121,7 +121,7 @@ void Enter2D(void)
 {
 	// Linux: work around game window sent to background after showing a dialog box
 	// Windows: work around alert box appearing behind game
-#if !__APPLE__
+#if !__APPLE__ && !defined(__EMSCRIPTEN__)
 	if (gSDLWindow)
 	{
 		SDL_SetWindowFullscreen(gSDLWindow, false);
@@ -136,7 +136,7 @@ void Enter2D(void)
 
 void Exit2D(void)
 {
-#if !__APPLE__
+#if !__APPLE__ && !defined(__EMSCRIPTEN__)
 	if (gSDLWindow)
 	{
 		SDL_PumpEvents();
@@ -228,6 +228,13 @@ void MoveToPreferredDisplay(void)
 
 void SetFullscreenMode(bool enforceDisplayPref)
 {
+#ifdef __EMSCRIPTEN__
+	// Fullscreen requests must originate in the page's user-gesture handler.
+	(void)enforceDisplayPref;
+	gGamePrefs.fullscreen = (SDL_GetWindowFlags(gSDLWindow) & SDL_WINDOW_FULLSCREEN) != 0;
+	SDL_GL_SetSwapInterval(1);
+	QD3D_OnWindowResized();
+#else
 	if (!gGamePrefs.fullscreen)
 	{
 		SDL_SetWindowFullscreen(gSDLWindow, 0);
@@ -268,4 +275,5 @@ void SetFullscreenMode(bool enforceDisplayPref)
 		SDL_HideCursor();
 	else
 		SDL_ShowCursor();
+#endif
 }

@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 
 /****************************/
@@ -17,8 +20,8 @@
 /****************************/
 
 static void SetupHighScoresScreen(void);
-static void AddNewScore(unsigned long newScore);
-static void EnterPlayerName(unsigned long newScore);
+static bool AddNewScore(unsigned long newScore);
+static bool EnterPlayerName(unsigned long newScore);
 static void MoveCursor(ObjNode *theNode);
 static bool TypeNewKey(void);
 static void UpdateNameAndCursor(Boolean doCursor, float x, float y, float z);
@@ -64,9 +67,12 @@ HighScoreType	gHighScores[NUM_SCORES];
 // INPUT: 	newScore = score to try to add, 0 == just show me
 //
 
-void ShowHighScoresScreen(unsigned long newScore)
+bool ShowHighScoresScreen(unsigned long newScore)
 {
-TQ3Vector3D	camDelta = {0,0,0};
+	static enum { ScoresSetup, ScoresName, ScoresRun, ScoresFade } state;
+	TQ3Vector3D camDelta = {0,0,0};
+	if (state == ScoresSetup)
+	{
 
 			/* INIT */
 			
@@ -77,19 +83,20 @@ TQ3Vector3D	camDelta = {0,0,0};
 	
 		/* ADD NEW SCORE */
 			
-	AddNewScore(newScore);
+		state = ScoresName;
+	}
+	if (state == ScoresName)
+	{
+		if (!AddNewScore(newScore)) return false;
 	
 
 		/* PREP HIGH SCORES SHOW */
 		
-	PrepHighScoresShow();
-		
-		
-			/* SHOW THE SCORES */
-
-	do
+		PrepHighScoresShow();
+		state = ScoresRun;
+	}
+	if (state == ScoresRun)
 	{
-		QD3D_CalcFramesPerSecond();					
 		MoveObjects();
 		
 				/* ROTATE SPIRAL */
@@ -105,20 +112,21 @@ TQ3Vector3D	camDelta = {0,0,0};
 		QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);	
 
 		UpdateInput();
-		if (UserWantsOut())
-			break;
-			
-	}while(gGameViewInfoPtr->cameraPlacement.cameraLocation.x < 2200);
+		if (!UserWantsOut() && gGameViewInfoPtr->cameraPlacement.cameraLocation.x < 2200)
+			return false;
+		state = ScoresFade;
+	}
 
 
 			/* CLEANUP */
 
-	Render_FreezeFrameFadeOut();
+	if (!Render_FreezeFrameFadeOut()) return false;
 
 	DeleteAllObjects();
 	Free3DMFGroup(MODEL_GROUP_HIGHSCORES);
 	QD3D_DisposeWindowSetup(&gGameViewInfoPtr);
-
+	state = ScoresSetup;
+	return true;
 }
 
 
@@ -257,7 +265,10 @@ err:
 				
 	count = sizeof(HighScoreType) * NUM_SCORES;
 	FSWrite(refNum, &count, (Ptr)&gHighScores[0]);	
-	FSClose(refNum);			
+	FSClose(refNum);
+#ifdef __EMSCRIPTEN__
+	EM_ASM({ Module['persist'](); });
+#endif
 
 }
 
@@ -286,45 +297,41 @@ char				blank[] = "               ";
 
 /*************************** ADD NEW SCORE ****************************/
 
-static void AddNewScore(unsigned long newScore)
+static bool AddNewScore(unsigned long newScore)
 {
-short	slot,i;
-
-			/* FIND INSERT SLOT */
-	
-	for (slot=0; slot < NUM_SCORES; slot++)
+	static int slot = -1;
+	if (slot < 0)
 	{
-		if (newScore > gHighScores[slot].score)
-			goto	got_slot;
+		for (slot = 0; slot < NUM_SCORES; slot++)
+			if (newScore > gHighScores[slot].score) break;
+		if (slot == NUM_SCORES)
+		{
+			slot = -1;
+			return true;
+		}
 	}
-	return;
-	
-	
-got_slot:
-			/* GET PLAYER'S NAME */
-			
-	EnterPlayerName(newScore);
-	
-			/* INSERT INTO LIST */
-
-	for (i = NUM_SCORES-1; i > slot; i--)						// make hole
+	if (!EnterPlayerName(newScore)) return false;
+	for (int i = NUM_SCORES-1; i > slot; i--)
 		gHighScores[i] = gHighScores[i-1];
-	gHighScores[slot] = gNewName;								// insert new name 'n stuff
-	
-			/* UPDATE THE FILE */
-			
+	gHighScores[slot] = gNewName;
 	SaveHighScores();
+	slot = -1;
+	return true;
 }
 
 
 /******************** ENTER PLAYER NAME **************************/
 
-static void EnterPlayerName(unsigned long newScore)
+static bool EnterPlayerName(unsigned long newScore)
 {
-TQ3Point3D	camPt = gGameViewInfoPtr->cameraPlacement.cameraLocation;
-float		camWobble = 0;
-short		i;
-
+	static bool active;
+	static TQ3Point3D camPt;
+	static float camWobble;
+	if (!active)
+	{
+	camPt = gGameViewInfoPtr->cameraPlacement.cameraLocation;
+	camWobble = 0;
+	short i;
 				/*********/
 				/* SETUP */
 				/*********/
@@ -370,13 +377,12 @@ short		i;
 			/* MAIN LOOP */
 			/*************/
 
-	QD3D_CalcFramesPerSecond();
 	SDL_StartTextInput(gSDLWindow);
 
-	do
+	active = true;
+	}
 	{
 		UpdateInput();
-		QD3D_CalcFramesPerSecond();
 		MoveObjects();
 
 				/* CHECK FOR KEY */
@@ -395,12 +401,18 @@ short		i;
 				/* DRAW SCENE */
 				
 		QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);	
-	} while (!GetSDLKeyState(SDL_SCANCODE_RETURN) && !GetSDLKeyState(SDL_SCANCODE_KP_ENTER));
+		if (!GetSDLKeyState(SDL_SCANCODE_RETURN) && !GetSDLKeyState(SDL_SCANCODE_KP_ENTER))
+			return false;
+	}
 
 			/* CLEANUP */
 
 	SDL_StopTextInput(gSDLWindow);
+	// Text input suppresses UI needs; do not reinterpret its Return as a new confirm.
+	ClearInputStates();
 	DeleteAllObjects();
+	active = false;
+	return true;
 }
 
 

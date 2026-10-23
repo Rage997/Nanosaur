@@ -95,6 +95,7 @@ extern	void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(Q
 extern	void QD3D_UpdateCameraFrom(QD3DSetupOutputType *setupInfo, TQ3Point3D *from);
 extern	void QD3D_MoveCameraFromTo(QD3DSetupOutputType *setupInfo, TQ3Vector3D *moveVector, TQ3Vector3D *lookAtVector);
 extern	void	QD3D_CalcFramesPerSecond(void);
+void QD3D_ResetFrameTimer(void);
 extern	void QD3D_NewViewDef(QD3DSetupInputType *viewDef);
 void MakeShadowTexture(void);
 void QD3D_OnWindowResized(void);
