@@ -117,6 +117,8 @@ void Free3DMFGroup(Byte groupNum)
 
 	if (gObjectGroupFile[groupNum] != nil)
 	{
+		for (int i = 0; i < gObjectGroupFile[groupNum]->numMeshes; i++)
+			RenderWeb_ReleaseMesh(gObjectGroupFile[groupNum]->meshes[i]);
 		Q3MetaFile_Dispose(gObjectGroupFile[groupNum]);
 		gObjectGroupFile[groupNum] = nil;
 	}

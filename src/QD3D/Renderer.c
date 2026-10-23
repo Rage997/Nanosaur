@@ -8,9 +8,11 @@
 /****************************/
 
 #include <SDL3/SDL.h>
+#ifndef __EMSCRIPTEN__
 #include <SDL3/SDL_opengl.h>
 #if !OSXPPC
 #include <SDL3/SDL_opengl_glext.h>
+#endif
 #endif
 #include "game.h"
 
@@ -103,6 +105,7 @@ static const TQ3Point2D kFullscreenQuadPointsNDC[4] =
 	{ 1.0f,  1.0f},
 };
 
+#ifndef __EMSCRIPTEN__
 static const uint8_t kFullscreenQuadTriangles[2][3] =
 {
 	{0, 1, 2},
@@ -120,6 +123,7 @@ static const TQ3Param2D kFullscreenQuadUVs[4] =
 #else
 static const int gBackdropWidthPOT = 1024;
 static const int gBackdropHeightPOT = 512;
+#endif
 #endif
 
 #pragma mark -
@@ -150,6 +154,11 @@ static inline void ClearColorRGBA(TQ3ColorRGBA c)
 static void SetInitialState_Impl(GLenum stateEnum, bool* stateFlagPtr, bool initialValue)
 {
 	*stateFlagPtr = initialValue;
+#ifdef __EMSCRIPTEN__
+	if (stateEnum == GL_TEXTURE_2D || stateEnum == GL_LIGHTING || stateEnum == GL_FOG
+		|| stateEnum == GL_ALPHA_TEST || stateEnum == GL_NORMALIZE || stateEnum == GL_COLOR_MATERIAL)
+		return;
+#endif
 	if (initialValue)
 		glEnable(stateEnum);
 	else
@@ -160,15 +169,22 @@ static void SetInitialState_Impl(GLenum stateEnum, bool* stateFlagPtr, bool init
 static void SetInitialClientState_Impl(GLenum stateEnum, bool* stateFlagPtr, bool initialValue)
 {
 	*stateFlagPtr = initialValue;
+#ifdef __EMSCRIPTEN__
+	(void) stateEnum;
+#else
 	if (initialValue)
 		glEnableClientState(stateEnum);
 	else
 		glDisableClientState(stateEnum);
 	CHECK_GL_ERROR();
+#endif
 }
 
 static inline void SetState_Impl(GLenum stateEnum, bool* stateFlagPtr, bool enable)
 {
+#ifdef __EMSCRIPTEN__
+	SetInitialState_Impl(stateEnum, stateFlagPtr, enable);
+#else
 	if (enable != *stateFlagPtr)
 	{
 		if (enable)
@@ -179,10 +195,15 @@ static inline void SetState_Impl(GLenum stateEnum, bool* stateFlagPtr, bool enab
 	}
 	else
 		gRenderStats.batchedStateChanges++;
+#endif
 }
 
 static inline void SetClientState_Impl(GLenum stateEnum, bool* stateFlagPtr, bool enable)
 {
+#ifdef __EMSCRIPTEN__
+	*stateFlagPtr = enable;
+	(void) stateEnum;
+#else
 	if (enable != *stateFlagPtr)
 	{
 		if (enable)
@@ -193,6 +214,7 @@ static inline void SetClientState_Impl(GLenum stateEnum, bool* stateFlagPtr, boo
 	}
 	else
 		gRenderStats.batchedStateChanges++;
+#endif
 }
 
 #define SetInitialState(stateEnum, initialValue) SetInitialState_Impl(stateEnum, &gState.hasState_##stateEnum, initialValue)
@@ -241,6 +263,9 @@ void Render_SetDefaultModifiers(RenderModifiers* dest)
 
 void Render_InitState(void)
 {
+#ifdef __EMSCRIPTEN__
+	RenderWeb_Init();
+#endif
 	SetInitialClientState(GL_VERTEX_ARRAY,				true);
 	SetInitialClientState(GL_NORMAL_ARRAY,				true);
 	SetInitialClientState(GL_COLOR_ARRAY,				false);
@@ -267,7 +292,9 @@ void Render_InitState(void)
 
 	gState.backdropClearColor = (TQ3ColorRGBA) {0, 0, 0, 1};
 	gState.viewportClearColor = (TQ3ColorRGBA) {0, 0, 0.5f, 1};
+#ifndef __EMSCRIPTEN__
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+#endif
 	ClearColorRGBA(gState.backdropClearColor);
 
 	gState.boundTexture = 0;
@@ -275,10 +302,14 @@ void Render_InitState(void)
 //	gState.currentTransform = NULL;
 
 	// Set misc GL defaults that apply throughout the entire game
+#ifndef __EMSCRIPTEN__
 	glAlphaFunc(GL_GREATER, 0.4999f);
+#endif
 	glCullFace(GL_BACK);
 	glFrontFace(GL_CCW);
+#ifndef __EMSCRIPTEN__
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+#endif
 
 	// Set up mesh queue
 	gMeshQueueSize = 0;
@@ -342,6 +373,9 @@ GLuint Render_LoadTexture(
 	if (flags & kRendererTextureFlags_ClampV)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+#ifdef __EMSCRIPTEN__
+	RenderWeb_UploadTexture(true, internalFormat, 0, 0, width, height, bufferFormat, bufferType, pixels, 0);
+#else
 	glTexImage2D(
 			GL_TEXTURE_2D,
 			0,						// mipmap level
@@ -353,6 +387,7 @@ GLuint Render_LoadTexture(
 			bufferType,				// size of each r,g,b
 			pixels);				// pointer to the actual texture pixels
 	CHECK_GL_ERROR();
+#endif
 
 	return textureName;
 }
@@ -415,6 +450,7 @@ void Render_StartFrame(void)
 {
 	// Clear rendering statistics
 	SDL_memset(&gRenderStats, 0, sizeof(gRenderStats));
+	RenderWeb_BeginFrame();
 
 	// Clear transparent queue
 	gMeshQueueSize = 0;
@@ -442,7 +478,8 @@ void Render_SetViewport(TQ3Area pane)
 
 	// Clear color & depth buffers
 	ClearColorRGBA(gState.viewportClearColor);
-	EnableFlag(glDepthMask);	// The depth mask must be re-enabled so we can clear the depth buffer.
+	glDepthMask(GL_TRUE);
+	gState.hasFlag_glDepthMask = true;
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -565,6 +602,17 @@ static int DepthSortCompare(void const* a_void, void const* b_void)
 
 static void DrawMeshList(int renderPass, const MeshQueueEntry* entry)
 {
+#ifdef __EMSCRIPTEN__
+	for (int i = 0; i < entry->numMeshes; i++)
+	{
+		const TQ3TriMeshData* mesh = entry->meshPtrList[i];
+		bool transparent = mesh->texturingMode == kQ3TexturingModeAlphaBlend
+			|| mesh->diffuseColor.a < .999f || entry->mods->diffuseColor.a < .999f;
+		if ((renderPass == kRenderPass_Transparent) != transparent) continue;
+		RenderWeb_DrawMesh(mesh, entry->transform, entry->mods);
+		gRenderStats.trianglesDrawn += mesh->numTriangles;
+	}
+#else
 	bool applyEnvironmentMap = entry->mods->statusBits & STATUS_BIT_REFLECTIONMAP;
 
 	bool matrixPushedYet = false;
@@ -731,6 +779,7 @@ static void DrawMeshList(int renderPass, const MeshQueueEntry* entry)
 	{
 		glPopMatrix();
 	}
+#endif
 }
 
 #pragma mark -
@@ -756,6 +805,7 @@ static void Render_EnterExit2D(bool enter)
 //		DisableClientState(GL_TEXTURE_COORD_ARRAY);
 		DisableClientState(GL_COLOR_ARRAY);
 		DisableClientState(GL_NORMAL_ARRAY);
+#ifndef __EMSCRIPTEN__
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glLoadIdentity();
@@ -763,13 +813,16 @@ static void Render_EnterExit2D(bool enter)
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
 		glLoadIdentity();
+#endif
 	}
 	else
 	{
+#ifndef __EMSCRIPTEN__
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
 		glPopMatrix();
+#endif
 		RestoreStateFromBackup(GL_LIGHTING,		&backup3DState);
 		RestoreStateFromBackup(GL_FOG,			&backup3DState);
 		RestoreStateFromBackup(GL_DEPTH_TEST,	&backup3DState);
@@ -836,6 +889,10 @@ static void Render_DrawBackdropQuad(bool keepBackdropAspectRatio)
 	pts[2] = (TQ3Point2D) { ndcLeft, ndcTop };
 	pts[3] = (TQ3Point2D) { ndcRight, ndcTop };
 
+#ifdef __EMSCRIPTEN__
+	glDisable(GL_BLEND);
+	RenderWeb_DrawQuad(pts, &(TQ3ColorRGBA){1,1,1,1}, true);
+#else
 	glColor4f(1, 1, 1, 1);
 	EnableState(GL_TEXTURE_2D);
 	EnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -846,6 +903,7 @@ static void Render_DrawBackdropQuad(bool keepBackdropAspectRatio)
 	glTexCoordPointer(2, GL_FLOAT, 0, uvs);
 #endif
 	glDrawElements(GL_TRIANGLES, 3*2, GL_UNSIGNED_BYTE, kFullscreenQuadTriangles);
+#endif
 }
 
 #pragma mark -
@@ -965,6 +1023,12 @@ void Render_DrawBackdrop(bool keepBackdropAspectRatio)
 		GAME_ASSERT(damageRect.bottom <= gBackdropHeightPOT);
 #endif
 
+#ifdef __EMSCRIPTEN__
+		RenderWeb_UploadTexture(false, GL_RGBA, damageRect.left, damageRect.top,
+			damageRect.right-damageRect.left, damageRect.bottom-damageRect.top,
+			GL_BGRA, GL_UNSIGNED_INT_8_8_8_8,
+			gBackdropPixels + damageRect.top*GAME_VIEW_WIDTH + damageRect.left, GAME_VIEW_WIDTH);
+#else
 		// Set unpack row length to 640
 		GLint pUnpackRowLength;
 		glGetIntegerv(GL_UNPACK_ROW_LENGTH, &pUnpackRowLength);
@@ -988,6 +1052,7 @@ void Render_DrawBackdrop(bool keepBackdropAspectRatio)
 
 		// Restore unpack row length
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, pUnpackRowLength);
+#endif
 
 		ClearPortDamage();
 	}
@@ -1003,11 +1068,15 @@ static void DrawFadeOverlay(float opacity)
 	glViewport(0, 0, gWindowWidth, gWindowHeight);
 	Render_Enter2D();
 	EnableState(GL_BLEND);
+#ifdef __EMSCRIPTEN__
+	RenderWeb_DrawQuad(kFullscreenQuadPointsNDC, &(TQ3ColorRGBA){0,0,0,opacity}, false);
+#else
 	DisableState(GL_TEXTURE_2D);
 	DisableClientState(GL_TEXTURE_COORD_ARRAY);
 	glColor4f(0, 0, 0, opacity);
 	glVertexPointer(2, GL_FLOAT, 0, kFullscreenQuadPointsNDC);
 	glDrawElements(GL_TRIANGLES, 3*2, GL_UNSIGNED_BYTE, kFullscreenQuadTriangles);
+#endif
 	Render_Exit2D();
 }
 
@@ -1018,57 +1087,25 @@ void Render_SetWindowGamma(float percent)
 	gFadeOverlayOpacity = (100.0f - percent) / 100.0f;
 }
 
-void Render_FreezeFrameFadeOut(void)
+bool Render_FreezeFrameFadeOut(void)
 {
-#if !ALLOW_FADE
-	return;
-#endif
-
-	Uint32 startTicks = SDL_GetTicks();
-//	gFadeOverlayOpacity = 0;
-
-	while (gFadeOverlayOpacity < 1)
+#if ALLOW_FADE
+	static float elapsed = 0;
+	elapsed += gFramesPerSecondFrac;
+	gFadeOverlayOpacity = fminf(1.0f, elapsed / kFreezeFrameFadeOutDuration);
+	UpdateInput();
+	if (!gGameViewInfoPtr)
 	{
-		Uint32 ticks = SDL_GetTicks();
-		gFadeOverlayOpacity = ((ticks - startTicks) / 1000.0f / kFreezeFrameFadeOutDuration);
-		if (gFadeOverlayOpacity > 1.0f)
-			gFadeOverlayOpacity = 1.0f;
-
-		UpdateInput();
-
-		if (!gGameViewInfoPtr)
-		{
-			Render_StartFrame();
-			Render_DrawBackdrop(true);
-			Render_EndFrame();
-			SDL_GL_SwapWindow(gSDLWindow);
-		}
-		else if (gTerrainPtr)
-		{
-			QD3D_DrawScene(gGameViewInfoPtr, DrawTerrain);
-		}
-		else
-		{
-			QD3D_DrawScene(gGameViewInfoPtr, DrawObjects);
-		}
-
-//		if (fadeSound)
-//		{
-//			FadeGlobalVolume(gGammaFadeFactor);
-//		}
-
-		QD3D_CalcFramesPerSecond();
-//		DoSDLMaintenance();
+		Render_StartFrame();
+		Render_DrawBackdrop(true);
+		Render_EndFrame();
+		SDL_GL_SwapWindow(gSDLWindow);
 	}
-
-	gFadeOverlayOpacity = 1;		// hold pitch black until fading back in
-
-//	if (fadeSound)
-//	{
-//		StopAllEffectChannels();
-//		KillSong();
-//		FadeGlobalVolume(1);
-//	}
-//
-//	FlushMouseButtonPress();
+	else
+		QD3D_DrawScene(gGameViewInfoPtr, gTerrainPtr ? DrawTerrain : DrawObjects);
+	if (gFadeOverlayOpacity < 1) return false;
+	elapsed = 0;
+#endif
+	gFadeOverlayOpacity = 1;
+	return true;
 }

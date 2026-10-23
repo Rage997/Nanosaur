@@ -63,6 +63,7 @@ enum
 
 void InitInput(void);
 void UpdateInput(void);
+void ClearInputStates(void);
 
 bool GetNewSDLKeyState(unsigned short sdlScanCode);
 bool GetSDLKeyState(unsigned short sdlScanCode);

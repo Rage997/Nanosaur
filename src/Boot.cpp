@@ -4,6 +4,9 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 #include "Pomme.h"
 #include "PommeGraphics.h"
@@ -81,6 +84,12 @@ static void Boot(int argc, char** argv)
 	SDL_SetLogPriorities(SDL_LOG_PRIORITY_INFO);
 #endif
 
+#ifdef __EMSCRIPTEN__
+	// The page restores this IDBFS mount before allowing the game to start.
+	setenv("XDG_CONFIG_HOME", "/storage", 1);
+	SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+#endif
+
 	// Start our "machine"
 	Pomme::Init();
 
@@ -95,12 +104,17 @@ retryVideo:
 	// Initialize SDL video subsystem
 	if (!SDL_Init(SDL_INIT_VIDEO))
 	{
-		throw std::runtime_error("Couldn't initialize SDL video subsystem.");
+		throw std::runtime_error(std::string("Couldn't initialize SDL video subsystem: ") + SDL_GetError());
 	}
 
 	// Create window
+#ifdef __EMSCRIPTEN__
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+#endif
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
 	gCurrentAntialiasingLevel = gGamePrefs.antialiasingLevel;
@@ -149,6 +163,7 @@ static void Shutdown()
 	// Always restore the user's mouse acceleration before exiting.
 	// SetMacLinearMouse(false);
 
+	DisposeMovie();
 	Pomme::Shutdown();
 
 	if (gSDLWindow)
@@ -160,6 +175,61 @@ static void Shutdown()
 	SDL_Quit();
 }
 
+#ifdef __EMSCRIPTEN__
+static bool webSuspended;
+
+extern "C" EMSCRIPTEN_KEEPALIVE void WebSuspend(int suspended)
+{
+	if (!gSDLWindow || webSuspended == (suspended != 0)) return;
+	webSuspended = suspended != 0;
+	PauseAllChannels(webSuspended || gGamePaused);
+	PauseMovie(webSuspended);
+	ClearInputStates();
+	QD3D_ResetFrameTimer();
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void WebResize(int width, int height)
+{
+	if (!gSDLWindow || width < 1 || height < 1) return;
+	SDL_SetWindowSize(gSDLWindow, width, height);
+	QD3D_OnWindowResized();
+}
+
+
+extern "C" EMSCRIPTEN_KEEPALIVE void WebClearInput(void)
+{
+	if (gSDLWindow) ClearInputStates();
+}
+
+static void WebFrame(void)
+{
+	if (webSuspended) return;
+	try
+	{
+		QD3D_CalcFramesPerSecond();
+		GameMain();
+	}
+	catch (Pomme::QuitRequest&)
+	{
+		emscripten_cancel_main_loop();
+		Shutdown();
+		EM_ASM({ Module['onExit'](); });
+	}
+	catch (std::exception& error)
+	{
+		emscripten_cancel_main_loop();
+		EM_ASM({ Module['reportError'](UTF8ToString($0)); }, error.what());
+		Shutdown();
+	}
+	catch (...)
+	{
+		emscripten_cancel_main_loop();
+		EM_ASM({ Module['reportError']('Unknown game error'); });
+		Shutdown();
+	}
+}
+#endif
+
 int main(int argc, char** argv)
 {
 	bool success = true;
@@ -168,13 +238,23 @@ int main(int argc, char** argv)
 	try
 	{
 		Boot(argc, argv);
-		GameMain();
+		QD3D_ResetFrameTimer();
+#ifdef __EMSCRIPTEN__
+		emscripten_set_main_loop(WebFrame, 0, false);
+		return 0;
+#else
+		while (true)
+		{
+			QD3D_CalcFramesPerSecond();
+			GameMain();
+		}
+#endif
 	}
 	catch (Pomme::QuitRequest&)
 	{
 		// no-op, the game may throw this exception to shut us down cleanly
 	}
-#if !(_DEBUG)
+#if !(_DEBUG) || defined(__EMSCRIPTEN__)
 	// In release builds, catch anything that might be thrown by GameMain
 	// so we can show an error dialog to the user.
 	catch (std::exception& ex)		// Last-resort catch
@@ -194,7 +274,11 @@ int main(int argc, char** argv)
 	if (!success)
 	{
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Uncaught exception: %s", uncaught.c_str());
+#ifdef __EMSCRIPTEN__
+		EM_ASM({ Module['reportError'](UTF8ToString($0)); }, uncaught.c_str());
+#else
 		SDL_ShowSimpleMessageBox(0, GAME_FULL_NAME, uncaught.c_str(), nullptr);
+#endif
 	}
 
 	return success ? 0 : 1;

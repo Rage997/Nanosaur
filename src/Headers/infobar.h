@@ -28,7 +28,7 @@ void NextAttackMode(void);
 void PreviousAttackMode(void);
 extern	void InitMyInventory(void);
 extern	void AddToScore(long points);
-extern	void DoPaused(void);
+bool DoPaused(void);
 extern	void DecAsteroidTimer(void);
 extern	void GetHealth(float amount);
 

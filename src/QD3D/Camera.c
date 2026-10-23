@@ -273,7 +273,9 @@ void CalcCameraMatrixInfo(QD3DSetupOutputType *setupInfo)
 {
 			/* INIT PROJECTION MATRIX */
 
+#ifndef __EMSCRIPTEN__
 	glMatrixMode(GL_PROJECTION);
+#endif
 
 	FillProjectionMatrix(
 		&gCameraViewToFrustumMatrix,
@@ -282,12 +284,16 @@ void CalcCameraMatrixInfo(QD3DSetupOutputType *setupInfo)
 		setupInfo->hither,
 		setupInfo->yon);
 
+#ifndef __EMSCRIPTEN__
 	glLoadMatrixf((const GLfloat*)&gCameraViewToFrustumMatrix.value[0][0]);
+#endif
 
 
 			/* INIT MODELVIEW MATRIX */
 
+#ifndef __EMSCRIPTEN__
 	glMatrixMode(GL_MODELVIEW);
+#endif
 
 	FillLookAtMatrix(
 		&gCameraWorldToViewMatrix,
@@ -295,7 +301,9 @@ void CalcCameraMatrixInfo(QD3DSetupOutputType *setupInfo)
 		&setupInfo->cameraPlacement.pointOfInterest,
 		&setupInfo->cameraPlacement.upVector);
 
+#ifndef __EMSCRIPTEN__
 	glLoadMatrixf((const GLfloat*)&gCameraWorldToViewMatrix.value[0][0]);
+#endif
 
 
 
@@ -304,6 +312,7 @@ void CalcCameraMatrixInfo(QD3DSetupOutputType *setupInfo)
 
 			/* UPDATE LIGHT POSITIONS */
 
+#ifndef __EMSCRIPTEN__
 	for (int i = 0; i < setupInfo->lights.numFillLights; i++)
 	{
 		GLfloat lightVec[4];
@@ -320,6 +329,7 @@ void CalcCameraMatrixInfo(QD3DSetupOutputType *setupInfo)
 
 	glGetFloatv(GL_MODELVIEW_MATRIX, (GLfloat *)&gCameraWorldToViewMatrix.value[0][0]);		// get camera's world to view matrix
 	glGetFloatv(GL_PROJECTION_MATRIX, (GLfloat *)&gCameraViewToFrustumMatrix.value[0][0]);	// get camera's view to frustrum matrix (to calc screen coords)
+#endif
 	Q3Matrix4x4_Multiply(&gCameraWorldToViewMatrix, &gCameraViewToFrustumMatrix, &gCameraWorldToFrustumMatrix);		// calc world to frustum matrix
 
 

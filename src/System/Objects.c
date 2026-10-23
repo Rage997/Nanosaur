@@ -501,7 +501,7 @@ ObjNode *tempNode;
 		// If the node has ownership of this mesh's memory, dispose of it
 		if (theNode->OwnsMeshMemory[i])
 		{
-			Q3TriMeshData_Dispose(theNode->MeshList[i]);
+			{ RenderWeb_ReleaseMesh(theNode->MeshList[i]); Q3TriMeshData_Dispose(theNode->MeshList[i]); }
 		}
 
 		theNode->MeshList[i] = nil;

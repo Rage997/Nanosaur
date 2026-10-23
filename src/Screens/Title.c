@@ -42,7 +42,10 @@ static const float	kBackgroundLength			= 300.0f;
 
 /********************** DO TITLE SCREEN *************************/
 
-void DoTitleScreen(void)
+bool DoTitleScreen(void)
+{
+static enum { TitleSetup, TitleRun, TitleFade } state;
+if (state == TitleSetup)
 {
 FSSpec spec;
 QD3DSetupInputType		viewDef;
@@ -170,27 +173,28 @@ TQ3Point3D		cameraFrom = { 110, 90, 190.0 };
 			
 	MakeFadeEvent(true);								// start fade-in		
 			
-	QD3D_CalcFramesPerSecond();
-	
-	while (1)
+	state = TitleRun;
+}
+	if (state == TitleRun)
 	{
 		MoveObjects();
 		QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);
-		QD3D_CalcFramesPerSecond();
-		UpdateInput();									// keys get us out
-		if (UserWantsOut())
-			break;
+		UpdateInput();
+		if (!UserWantsOut()) return false;
+		state = TitleFade;
 	}
 	
 			/* CLEANUP */
 
-	Render_FreezeFrameFadeOut();
+	if (!Render_FreezeFrameFadeOut()) return false;
 
 	DeleteAllObjects();
 	FreeAllSkeletonFiles(-1);
 	DeleteAll3DMFGroups();
 	QD3D_DisposeWindowSetup(&gGameViewInfoPtr);		
 	gDisableAnimSounds = false;
+	state = TitleSetup;
+	return true;
 }
 
 
@@ -226,7 +230,10 @@ static void MoveTitleText(ObjNode *theNode)
 
 /********************** DO PANGEA LOGO **********************************/
 
-void DoPangeaLogo(void)
+bool DoPangeaLogo(void)
+{
+static enum { LogoSetup, LogoRun, LogoFade } state;
+if (state == LogoSetup)
 {
 ObjNode		*backObj;
 TQ3Point3D			cameraFrom = { 0, 0, 70.0 };
@@ -287,20 +294,22 @@ FSSpec			spec;
 			/* MAIN LOOP */
 			/*************/
 			
-	PlaySong(2,false);			
-
-	while((!gResetSong) && gSongPlayingFlag)					// wait until song stops
+	PlaySong(2,false);
+	state = LogoRun;
+}
+	if (state == LogoRun)
 	{
 		UpdateInput();
-		if (UserWantsOut())
-			break;
-
-		MoveObjects();
-		QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);
-		QD3D_CalcFramesPerSecond();					
+		if (!UserWantsOut() && !gResetSong && gSongPlayingFlag)
+		{
+			MoveObjects();
+			QD3D_DrawScene(gGameViewInfoPtr,DrawObjects);
+			return false;
+		}
+		state = LogoFade;
 	}
 
-	Render_FreezeFrameFadeOut();
+	if (!Render_FreezeFrameFadeOut()) return false;
 
 
 			/***********/
@@ -311,6 +320,8 @@ FSSpec			spec;
 	DeleteAll3DMFGroups();
 	QD3D_DisposeWindowSetup(&gGameViewInfoPtr);		
 	KillSong();
+	state = LogoSetup;
+	return true;
 }
 
 
@@ -335,91 +346,69 @@ struct SlideshowEntry
 	void (*postDrawCallback)(void);
 };
 
-static void Slideshow(const struct SlideshowEntry* slides)
+static bool Slideshow(const struct SlideshowEntry* slides)
 {
-	FSSpec spec;
-
-	Render_InitState();
-	Render_AllocBackdrop(GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT);
-
-	for (int i = 0; slides[i].imagePath != NULL; i++)
+	static enum { SlidesSetup, SlideSetup, SlideRun, SlidesFade } state;
+	static int index;
+	static float age;
+	static bool promptShown;
+	if (state == SlidesSetup)
 	{
-		const struct SlideshowEntry* slide = &slides[i];
-		
-		OSErr result = FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, slide->imagePath, &spec);
-		GAME_ASSERT(result == noErr);
-
-		PicHandle picHandle = GetPictureFromTGA(&spec);
-		GAME_ASSERT(picHandle);
-		GAME_ASSERT(*picHandle);
-
-		DrawPicture(picHandle, &(**picHandle).picFrame);
-		DisposeHandle((Handle)picHandle);
-
-		if (slide->postDrawCallback)
-		{
-			slide->postDrawCallback();
-		}
-
-		uint8_t* clearColor = (uint8_t*)gBackdropPixels;
-		Render_SetBackdropClearColor((TQ3ColorRGBA)
-			{
-				.r = clearColor[1]/255.0f,
-				.g = clearColor[2]/255.0f,
-				.b = clearColor[3]/255.0f,
-				.a = 1.0f,
-			});
-
-		UpdateInput();
-
-		float slideAge = 0;
-		bool promptShownYet = false;
-
-		bool wantOut = false;
-
-		do
-		{
-			float gamma = 100;
-#if ALLOW_FADE
-			if (i == 0)
-			{
-				gamma = 100.0f * slideAge / 1.0f;
-				if (gamma > 100)
-					gamma = 100;
-			}
-			Render_SetWindowGamma(gamma);
-#endif
-
-			slideAge += gFramesPerSecondFrac;
-
-			if (!promptShownYet && slideAge > 2)
-			{
-				MoveTo(494, 480-4);
-				RGBBackColor2(0);
-				RGBForeColor2(0xFFFFFF);
-				DrawStringC(" Hit SPACE to continue ");
-				promptShownYet = true;
-			}
-
-			UpdateInput();
-			DoSoundMaintenance();
-			QD3D_CalcFramesPerSecond(); // required to properly cap the framerate
-
-			Render_StartFrame();
-			Render_DrawBackdrop(true);
-			Render_EndFrame();
-			SDL_GL_SwapWindow(gSDLWindow);
-
-			if (gamma < 100)
-				wantOut = false;
-			else
-				wantOut = UserWantsOut();
-		} while (!wantOut);
+		Render_InitState();
+		Render_AllocBackdrop(GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT);
+		index = 0;
+		state = SlideSetup;
 	}
-
-	Render_FreezeFrameFadeOut();
-
+	if (state == SlideSetup)
+	{
+		FSSpec spec;
+		const struct SlideshowEntry* slide = &slides[index];
+		GAME_ASSERT(FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, slide->imagePath, &spec) == noErr);
+		PicHandle picture = GetPictureFromTGA(&spec);
+		GAME_ASSERT(picture && *picture);
+		DrawPicture(picture, &(*picture)->picFrame);
+		DisposeHandle((Handle)picture);
+		if (slide->postDrawCallback) slide->postDrawCallback();
+		uint8_t* color = (uint8_t*)gBackdropPixels;
+		Render_SetBackdropClearColor((TQ3ColorRGBA){color[1]/255.f, color[2]/255.f, color[3]/255.f, 1});
+		age = 0;
+		promptShown = false;
+		UpdateInput();
+		state = SlideRun;
+	}
+	if (state == SlideRun)
+	{
+		age += gFramesPerSecondFrac;
+		float gamma = 100;
+#if ALLOW_FADE
+		if (index == 0) gamma = fminf(100, 100*age);
+#endif
+		Render_SetWindowGamma(gamma);
+		if (!promptShown && age > 2)
+		{
+			MoveTo(494, 476);
+			RGBBackColor2(0);
+			RGBForeColor2(0xFFFFFF);
+			DrawStringC(" Hit SPACE to continue ");
+			promptShown = true;
+		}
+		UpdateInput();
+		DoSoundMaintenance();
+		Render_StartFrame();
+		Render_DrawBackdrop(true);
+		Render_EndFrame();
+		SDL_GL_SwapWindow(gSDLWindow);
+		if (gamma >= 100 && UserWantsOut())
+		{
+			index++;
+			state = slides[index].imagePath ? SlideSetup : SlidesFade;
+		}
+		return false;
+	}
+	if (!Render_FreezeFrameFadeOut()) return false;
 	Render_DisposeBackdrop();
+	state = SlidesSetup;
+	return true;
 }
 
 
@@ -436,7 +425,7 @@ static void ShowCharity_SourcePortVersionOverlay(void)
 	DrawStringC("Version " GAME_VERSION);
 }
 
-void ShowCharity(void)
+bool ShowCharity(void)
 {
 	const char* firstImage = PRO_MODE ? ":Images:Boot1Pro.tga" : ":Images:Boot1.tga";
 
@@ -445,7 +434,7 @@ void ShowCharity(void)
 			{ ":Images:Boot2.tga", NULL },
 			{ NULL, NULL },
 	};
-	Slideshow(slides);
+	return Slideshow(slides);
 }
 
 
@@ -467,12 +456,12 @@ static void ShowHelp_TechInfoOverlay(void)
 	y += LH; MoveTo(x, y); DrawStringC((const char*) glGetString(GL_RENDERER));
 }
 
-void ShowHelp(void)
+bool ShowHelp(void)
 {
 	const struct SlideshowEntry slides[] = {
 			{ ":Images:Help1.tga", ShowHelp_TechInfoOverlay },
 			{ NULL, NULL },
 	};
-	Slideshow(slides);
+	return Slideshow(slides);
 }
 

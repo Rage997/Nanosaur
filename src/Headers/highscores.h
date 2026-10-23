@@ -64,4 +64,4 @@ enum
 
 //=================================================================
 
-extern	void ShowHighScoresScreen(unsigned long newScore);
+bool ShowHighScoresScreen(unsigned long newScore);

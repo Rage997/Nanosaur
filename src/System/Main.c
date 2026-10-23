@@ -18,7 +18,7 @@
 
 static void InitLevel(void);
 static void CleanupLevel(void);
-static void PlayLevel(void);
+static bool PlayLevel(void);
 
 
 /****************************/
@@ -211,7 +211,6 @@ TQ3ColorRGB		c2 = { 1, .9, .6 };
 static void CleanupLevel(void)
 {
 	StopAllEffectChannels();
-	Render_FreezeFrameFadeOut();
 	DeleteAllObjects();
 	FreeAllSkeletonFiles(-1);
 	DisposeTerrain();
@@ -224,11 +223,15 @@ static void CleanupLevel(void)
 
 /**************** PLAY LEVEL ************************/
 
-static void PlayLevel(void)
+static bool PlayLevel(void)
 {
-float killDelay = KILL_DELAY;						// time to wait after I'm dead before fading out
-float	fps;
-FSSpec	spec;
+	static enum { LevelSetup, LevelRun, LevelPause, LevelFade, LevelMovie, LevelScores } state;
+	static float killDelay;
+	static FSSpec spec;
+	float fps = gFramesPerSecondFrac;
+	if (state == LevelSetup)
+	{
+	killDelay = KILL_DELAY;
 
 			/* INIT LEVEL */
 			
@@ -237,14 +240,15 @@ FSSpec	spec;
 	gGameOverFlag = false;
 
 	MakeFadeEvent(true);
-	QD3D_CalcFramesPerSecond();
+	state = LevelRun;
+	}
 		
 
 		/******************/
 		/* MAIN GAME LOOP */
 		/******************/
 	
-	while(true)
+	if (state == LevelRun)
 	{
 		fps = gFramesPerSecondFrac;
 		
@@ -269,7 +273,6 @@ FSSpec	spec;
 		DoMyTerrainUpdate();
 		UpdateInfobar();
 		QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
-		QD3D_CalcFramesPerSecond();
 
 				
 			/* SEE IF PAUSE GAME */
@@ -277,7 +280,8 @@ FSSpec	spec;
 		if (GetNewNeedState(kNeed_UIPause)						// see if pause/abort
 			|| IsCmdQPressed())
 		{
-			DoPaused();
+			state = LevelPause;
+			return false;
 		}
 
 
@@ -308,7 +312,10 @@ FSSpec	spec;
 			/* SEE IF GAME ENDED */				
 		
 		if (gGameOverFlag)
-			break;
+		{
+			state = LevelFade;
+			return false;
+		}
 			
 			
 			/* SEE IF GOT KILLED */
@@ -321,35 +328,32 @@ FSSpec	spec;
 				ResetPlayer();					// reset player
 				killDelay = KILL_DELAY;			// reset kill timer for next death
 			}
-		}	
+		}
+		return false;
 	}
-
-			/* CLEANUP */
-	CleanupLevel();
-
-
-			/* PLAY WIN MOVIE */
-	
-	if (gWonGameFlag)
+	if (state == LevelPause)
 	{
-		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Movies:Win.mov", &spec);
-		PlayAMovie(&spec);
+		if (DoPaused()) state = gGameOverFlag ? LevelFade : LevelRun;
+		return false;
 	}
-	
-			/* PLAY LOSE MOVIE */
-	else
+
+	if (state == LevelFade)
 	{
-		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Movies:Lose.mov", &spec);
-		PlayAMovie(&spec);
+		if (!Render_FreezeFrameFadeOut()) return false;
+		CleanupLevel();
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID,
+			gWonGameFlag ? ":Movies:Win.mov" : ":Movies:Lose.mov", &spec);
+		state = LevelMovie;
 	}
-
-
-			/* DO HIGH SCORES */
-		
-	if (!gSongPlayingFlag)						// make sure music is going
-		PlaySong(1,true);		
-		
-	ShowHighScoresScreen(gScore);
+	if (state == LevelMovie)
+	{
+		if (!PlayAMovie(&spec)) return false;
+		if (!gSongPlayingFlag) PlaySong(1, true);
+		state = LevelScores;
+	}
+	if (!ShowHighScoresScreen(gScore)) return false;
+	state = LevelSetup;
+	return true;
 }
 
 
@@ -361,29 +365,38 @@ FSSpec	spec;
 
 void GameMain(void)
 {
-unsigned long	someLong;
-
-				/**************/
-				/* BOOT STUFF */
-				/**************/
-				
-	ToolBoxInit();
- 	 		 	 		
- 	InitInput();
-
-	GetDateTime ((unsigned long *)(&someLong));		// init random seed
-	SetMyRandomSeed(someLong);
-	
-	ShowCharity();
-
-	LoadSoundBank();								// load sound bank for entire game
-
-	while(true)
+	static enum { GameBoot, GameCharity, GameLogo, GameTitle, GameMenu, GameLevel } state;
+	switch (state)
 	{
-		DoPangeaLogo();
-		DoTitleScreen();
-		DoMainMenu();
-		PlayLevel();
+		case GameBoot:
+		{
+			ToolBoxInit();
+			InitInput();
+			unsigned long seed;
+			GetDateTime(&seed);
+			SetMyRandomSeed(seed);
+			state = GameCharity;
+			break;
+		}
+		case GameCharity:
+			if (ShowCharity())
+			{
+				LoadSoundBank();
+				state = GameLogo;
+			}
+			break;
+		case GameLogo:
+			if (DoPangeaLogo()) state = GameTitle;
+			break;
+		case GameTitle:
+			if (DoTitleScreen()) state = GameMenu;
+			break;
+		case GameMenu:
+			if (DoMainMenu()) state = GameLevel;
+			break;
+		case GameLevel:
+			if (PlayLevel()) state = GameLogo;
+			break;
 	}
 }
 

@@ -32,8 +32,11 @@
     <p>You can jump, swim, run around, jet around, shoot stuff, etc. The general rule to playing the game is “if it moves, kill it or it’ll kill you.” You only have 20 minutes to collect all 5 egg species so being efficient about your actions is critical.</p>
     <p xml:lang="fr">Vous pouvez sauter, nager, courir, voler, tirer, etc. L’idée générale du jeu est « si un truc bouge, tuez-le avant qu’il ne vous tue ». Vous n’avez que 20 minutes pour récupérer les 5 espèces d’œufs : il est donc crucial d’être efficace dans vos actions.</p>
 
-    <p>About this port: Nanosaur was released in 1998 by Pangea Software. It was a pack-in game on Macs that came out around that time. This port aims to provide the best way to experience Nanosaur today. This port was made and re-released under permission from Pangea Software, Inc.</p>
-    <p xml:lang="fr">À propos de ce portage : Nanosaur fut initialement lancé en 1998 par Pangea Software. Ce jeu était fourni sur les Macs qui sortaient à cette époque. Ce portage a pour objectif d’offrir la meilleure façon de jouer à Nanosaur aujourd’hui. Ce portage a été réalisé et rediffusé avec la permission de Pangea Software, Inc.</p>
+    <p>About this port: Nanosaur was released in 1998 by Pangea Software and bundled with the original iMac. Iliyas Jorio created the modern native port and the Pomme Macintosh Toolbox compatibility layer, and re-released the game with permission from Pangea Software, Inc.</p>
+    <p xml:lang="fr">À propos de ce portage : Nanosaur est sorti en 1998 chez Pangea Software et était fourni avec le premier iMac. Iliyas Jorio a créé le portage natif moderne et Pomme, la couche de compatibilité avec la boîte à outils Macintosh, et a rediffusé le jeu avec la permission de Pangea Software, Inc.</p>
+
+    <p>This repository builds on that work with a WebAssembly/WebGL2 browser port while retaining the macOS, Windows, and Linux builds. The web additions include a browser launcher, fullscreen play, audio, and browser-persisted preferences and high scores. The browser version requires WebGL2 and supports keyboard and gamepad controls, but not touch controls.</p>
+    <p xml:lang="fr">Ce dépôt s’appuie sur ce travail pour proposer un portage WebAssembly/WebGL2 jouable dans un navigateur, tout en conservant les versions macOS, Windows et Linux. Les ajouts web comprennent une page de lancement, le jeu en plein écran, le son et la sauvegarde des préférences et des meilleurs scores dans le navigateur. La version pour navigateur nécessite WebGL2 et prend en charge le clavier et les manettes, mais pas les commandes tactiles.</p>
   </description>
 
   <categories>

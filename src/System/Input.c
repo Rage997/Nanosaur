@@ -50,7 +50,12 @@ enum
 
 #define JOYSTICK_FAKEDIGITAL_DEAD_ZONE .66f
 
-#if __APPLE__
+#if defined(__EMSCRIPTEN__)
+#define DEFAULTKB1_JUMP SDL_SCANCODE_X
+#define DEFAULTKB2_JUMP 0
+#define DEFAULTKB1_PICKUP SDL_SCANCODE_C
+#define DEFAULTKB2_PICKUP 0
+#elif __APPLE__
 #define DEFAULTKB1_JUMP		SDL_SCANCODE_LGUI
 #define DEFAULTKB2_JUMP		SDL_SCANCODE_RGUI
 #define DEFAULTKB1_PICKUP	SDL_SCANCODE_LALT
@@ -130,6 +135,15 @@ void InitInput(void)
 {
 }
 
+
+void ClearInputStates(void)
+{
+	SDL_ResetKeyboard();
+	SDL_memset(gRawKeyboardState, KEYSTATE_IGNOREHELD, sizeof(gRawKeyboardState));
+	SDL_memset(gNeedStates, KEYSTATE_IGNOREHELD, sizeof(gNeedStates));
+	gAnyNewKeysPressed = false;
+	gTextInput[0] = '\0';
+}
 
 void UpdateInput(void)
 {

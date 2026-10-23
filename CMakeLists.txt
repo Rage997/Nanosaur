@@ -60,6 +60,18 @@ add_compile_definitions(POMME_CASE_SENSITIVE_FSSPEC=1)
 # FIND SDL
 #------------------------------------------------------------------------------
 
+if(EMSCRIPTEN)
+	include(FetchContent)
+	set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+	set(SDL_STATIC ON CACHE BOOL "" FORCE)
+	set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+	set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+	set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+	FetchContent_Declare(SDL3
+		GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+		GIT_TAG 7f3ae3d57459e59943a4ecfefc8f6277ec6bf540) # release-3.2.28
+	FetchContent_MakeAvailable(SDL3)
+else()
 # If SDL3_DIR wasn't specified, discover if the user put some prebuilt SDL3
 # package in the 'extern' directory
 if(NOT DEFINED SDL3_DIR)
@@ -86,7 +98,8 @@ else()
 		set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL")
 	endif()
 	message("Building SDL3 from source: " ${SDL3_DIR})
-	add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
+	add_subdirectory("${SDL3_DIR}" "${CMAKE_BINARY_DIR}/SDL3" EXCLUDE_FROM_ALL)
+endif()
 endif()
 
 #------------------------------------------------------------------------------
@@ -95,7 +108,9 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
-find_package(OpenGL REQUIRED)
+if(NOT EMSCRIPTEN)
+	find_package(OpenGL REQUIRED)
+endif()
 
 #------------------------------------------------------------------------------
 # EXECUTABLE TARGET
@@ -209,7 +224,30 @@ else()
 endif()
 
 # Link core dependencies
-target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
+if(EMSCRIPTEN)
+	configure_file(packaging/Nanosaur.png "${CMAKE_CURRENT_BINARY_DIR}/Nanosaur.png" COPYONLY)
+	foreach(WEB_ASSET mac-background.webp nanosaur-splash.png crt-mask.png)
+		configure_file("packaging/web-assets/${WEB_ASSET}"
+			"${CMAKE_CURRENT_BINARY_DIR}/web-assets/${WEB_ASSET}" COPYONLY)
+	endforeach()
+	set_target_properties(${GAME_TARGET} PROPERTIES SUFFIX ".html")
+	target_link_options(${GAME_TARGET} PRIVATE
+		-fexceptions
+		-sMIN_WEBGL_VERSION=2
+		-sMAX_WEBGL_VERSION=2
+		-sALLOW_MEMORY_GROWTH=1
+		-sSTACK_SIZE=1048576
+		-sEXIT_RUNTIME=0
+		"-sEXPORTED_RUNTIME_METHODS=['callMain','FS','IDBFS','addRunDependency','removeRunDependency']"
+		-lidbfs.js
+		"SHELL:--preload-file ${GAME_DATADIR}@/Data"
+		"SHELL:--shell-file ${CMAKE_SOURCE_DIR}/packaging/web.html")
+	set_property(TARGET ${GAME_TARGET} APPEND PROPERTY LINK_DEPENDS
+		"${CMAKE_SOURCE_DIR}/packaging/web.html")
+else()
+	target_link_libraries(${GAME_TARGET} PRIVATE OpenGL::GL)
+endif()
 
 # Add required frameworks for KillMacMouseAcceleration
 if(APPLE)
@@ -282,8 +320,10 @@ else()
 	set(GAME_DATA_TARGET_LOCATION "$<TARGET_FILE_DIR:${GAME_TARGET}>/Data")
 endif()
 
-add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory "${GAME_DATADIR}" "${GAME_DATA_TARGET_LOCATION}")
+if(NOT EMSCRIPTEN)
+	add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${GAME_DATADIR}" "${GAME_DATA_TARGET_LOCATION}")
+endif()
 
 if(APPLE)
 	set(INFO_PLIST "${GAME_DATA_TARGET_LOCATION}/../Info.plist")

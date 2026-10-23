@@ -73,3 +73,32 @@ If you want to build the game **manually** instead, the rest of this document de
     ```
     If you'd like to enable runtime sanitizers, append `-DSANITIZE=1` to the **first** `cmake` call above.
 1. The game gets built in `build/Nanosaur`. Enjoy!
+
+## WebAssembly / WebGL2
+
+From the repository root, with [Emscripten](https://emscripten.org/docs/getting_started/downloads.html)
+installed and activated, CMake 3.21+, and Python 3:
+
+```sh
+git submodule update --init --recursive
+emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release
+cmake --build build-web -j
+python3 -m http.server 8000 --directory build-web
+```
+
+Open **http://localhost:8000/Nanosaur.html**. CMake fetches and builds pinned SDL 3.2.28;
+no desktop SDL installation is needed. To reuse a local SDL source checkout, add
+`-DFETCHCONTENT_SOURCE_DIR_SDL3=/path/to/SDL` to the configure command.
+
+### Hosting
+
+Deploy these build outputs together on a static HTTPS server:
+
+- `Nanosaur.html`, `Nanosaur.js`, `Nanosaur.wasm`, `Nanosaur.data`, `Nanosaur.png`
+- The complete `web-assets/` directory
+
+Serve `.wasm` as `application/wasm`. No application server or cross-origin isolation
+headers are required.
+
+When publishing this checkout, include the Pomme submodule’s CMake change that
+reuses an existing `SDL3::SDL3` target.

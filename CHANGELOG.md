@@ -3,6 +3,9 @@
 - **v1.4.5 (NOT RELEASED YET)**
 	- Ported to SDL 3
     - **NOTE:** The Mac version now requires macOS 10.13.
+	- Added a WebAssembly/WebGL2 build with shader-based rendering, original audio and cinematics, and browser-persisted preferences and high scores.
+	- Converted screens and gameplay to frame-stepped states shared by native and browser builds.
+	- Added a Blender-rendered vintage Macintosh browser intro with a Nanosaur CRT splash, live segmented download progress, responsive screen placement, automatic game startup, optional sound/fullscreen activation, and a chrome-free, full-window view.
 
 - **v1.4.4 (Feb. 5, 2023)**
 	- Fixed physics for very high framerates

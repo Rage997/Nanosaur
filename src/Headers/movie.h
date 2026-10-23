@@ -3,4 +3,6 @@
 //
 
 // Source port reimplementation
-void PlayAMovie(FSSpec *);
+bool PlayAMovie(FSSpec *);
+void DisposeMovie(void);
+void PauseMovie(bool pause);

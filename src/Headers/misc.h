@@ -41,7 +41,7 @@ extern	void ApplyFrictionToDeltas(float f,TQ3Vector3D *d);
 
 OSErr DrawPictureToScreen(FSSpec *myFSSpec, short x, short y);
 
-void DoSettingsScreen(void);
+bool DoSettingsScreen(void);
 
 void SetProModeSettings(int isPro);
 

@@ -10,6 +10,9 @@
 /***************/
 
 #include "game.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 
 /****************************/
@@ -51,13 +54,26 @@ Str255		numStr;
 	DoAlert (numStr);
 }
 
+static void ShowGameMessageBox(Uint32 flags, const char* title, const char* message)
+{
+#ifdef __EMSCRIPTEN__
+	EM_ASM({
+		const message = UTF8ToString($1) + ': ' + UTF8ToString($2);
+		if ($0) Module['reportError'](message);
+		else Module['reportWarning'](message);
+	}, flags == SDL_MESSAGEBOX_ERROR, title, message);
+#else
+	SDL_ShowSimpleMessageBox(flags, title, message, NULL);
+#endif
+}
+
 /*********************** DO ALERT *******************/
 
 void DoAlert(const char* s)
 {
 	SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Game Alert: %s", s);
 	Enter2D();
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, GAME_FULL_NAME, s, NULL);
+	ShowGameMessageBox(SDL_MESSAGEBOX_WARNING, GAME_FULL_NAME, s);
 	Exit2D();
 }
 
@@ -69,7 +85,7 @@ void DoAssert(const char* msg, const char* file, int line)
 	static char alertbuf[1024];
 	SDL_snprintf(alertbuf, 1024, "%s\n%s:%d", msg, file, line);
 	Enter2D();
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Assertion Failed!", alertbuf, NULL);
+	ShowGameMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Assertion Failed!", alertbuf);
 	ExitToShell();
 }
 
@@ -79,7 +95,7 @@ void DoFatalAlert(const char* s)
 {
 	SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game Fatal Alert: %s", s);
 	Enter2D();
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Fatal Alert", s, NULL);
+	ShowGameMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Fatal Alert", s);
 	CleanQuit();
 }
 
@@ -91,7 +107,7 @@ void DoFatalAlert2(const char* s1, const char* s2)
 	SDL_snprintf(alertbuf, 1024, "%s\n%s", s1, s2);
 	SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game Fatal Alert: %s", alertbuf);
 	Enter2D();
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Fatal Alert", alertbuf, NULL);
+	ShowGameMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Fatal Alert", alertbuf);
 	ExitToShell();
 }
 

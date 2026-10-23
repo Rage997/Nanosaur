@@ -17,7 +17,9 @@
 /*    PROTOTYPES            */
 /****************************/
 
+#ifndef __EMSCRIPTEN__
 static void CreateLights(QD3DLightDefType *lightDefPtr);
+#endif
 static TQ3Area GetAdjustedPane(Rect paneClip);
 
 
@@ -80,6 +82,7 @@ void QD3D_Shutdown(void)
 {
 	if (gGLContext)
 	{
+		RenderWeb_Shutdown();
 		SDL_GL_DestroyContext(gGLContext);
 		gGLContext = NULL;
 	}
@@ -188,6 +191,7 @@ QD3DSetupOutputType	*outputPtr;
 
 	Render_InitState();									// set up default GL state
 
+#ifndef __EMSCRIPTEN__
 	CreateLights(&setupDefPtr->lights);
 
 	if (setupDefPtr->lights.useFog && gGamePrefs.canDoFog)
@@ -206,6 +210,7 @@ QD3DSetupOutputType	*outputPtr;
 	}
 	else
 		glDisable(GL_FOG);
+#endif
 
 	Render_AllocBackdrop(GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT);	// creates GL texture for backdrop
 	Render_ClearBackdrop(0);									// avoid residual junk from previous backdrop
@@ -226,6 +231,7 @@ QD3DSetupOutputType	*data;
 	data = *dataHandle;
 	GAME_ASSERT(data);										// see if this setup exists
 
+	RenderWeb_ClearMeshes();
 	Render_DisposeBackdrop();								// deletes GL texture for backdrop
 
 	if (gShadowGLTextureName != 0)
@@ -252,6 +258,7 @@ QD3DSetupOutputType	*data;
 
 /********************* CREATE LIGHTS ************************/
 
+#ifndef __EMSCRIPTEN__
 static void CreateLights(QD3DLightDefType *lightDefPtr)
 {
 //	glEnable(GL_LIGHTING);	// controlled by renderer.c
@@ -312,6 +319,7 @@ static void CreateLights(QD3DLightDefType *lightDefPtr)
 		glDisable(GL_LIGHT0+i);
 	}
 }
+#endif
 
 
 
@@ -428,10 +436,18 @@ void QD3D_OnWindowResized(void)
 
 /************** QD3D CALC FRAMES PER SECOND *****************/
 
+static uint64_t gPreviousFrameTime;
+
+void QD3D_ResetFrameTimer(void)
+{
+	gPreviousFrameTime = SDL_GetPerformanceCounter();
+	gFramesPerSecond = 60;
+	gFramesPerSecondFrac = 1.0f / 60;
+}
+
 void QD3D_CalcFramesPerSecond(void)
 {
 	static uint64_t performanceFrequency = 0;
-	static uint64_t prevTime = 0;
 	uint64_t currTime;
 
 	if (performanceFrequency == 0)
@@ -439,9 +455,11 @@ void QD3D_CalcFramesPerSecond(void)
 		performanceFrequency = SDL_GetPerformanceFrequency();
 	}
 
+#ifndef __EMSCRIPTEN__
 	slow_down:
+#endif
 	currTime = SDL_GetPerformanceCounter();
-	uint64_t deltaTime = currTime - prevTime;
+	uint64_t deltaTime = currTime - gPreviousFrameTime;
 
 	if (deltaTime <= 0)
 	{
@@ -451,6 +469,7 @@ void QD3D_CalcFramesPerSecond(void)
 	{
 		gFramesPerSecond = performanceFrequency / (float)(deltaTime);
 
+#ifndef __EMSCRIPTEN__
 		if (gFramesPerSecond > MAX_FPS)					// keep from cooking the GPU
 		{
 			if (gFramesPerSecond - MAX_FPS > 1000)		// try to sneak in some sleep if we have 1 ms to spare
@@ -460,6 +479,7 @@ void QD3D_CalcFramesPerSecond(void)
 			goto slow_down;
 		}
 
+#endif
 		if (gFramesPerSecond < MIN_FPS)					// (avoid divide by 0's later)
 		{
 			gFramesPerSecond = MIN_FPS;
@@ -478,7 +498,7 @@ void QD3D_CalcFramesPerSecond(void)
 
 	gFramesPerSecondFrac = 1.0f / gFramesPerSecond;		// calc fractional for multiplication
 
-	prevTime = currTime;								// reset for next time interval
+	gPreviousFrameTime = currTime;
 
 
 			/* UPDATE DEBUG TEXT */

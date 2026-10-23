@@ -140,7 +140,7 @@ void Render_DrawBackdrop(bool keepBackdropAspectRatio);
 
 void Render_SetWindowGamma(float percent);
 
-void Render_FreezeFrameFadeOut(void);
+bool Render_FreezeFrameFadeOut(void);
 
 #pragma mark -
 
