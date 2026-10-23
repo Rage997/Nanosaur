@@ -1,5 +1,7 @@
 # Nanosaur — Native & Web
 
+**[Play Nanosaur in your browser](https://niccolozuppichini.com/Nanosaur/)**
+
 This repository includes a **WebAssembly/WebGL2 port** of [Pangea Software’s Nanosaur](https://www.pangeasoft.net/nano/), built on [Iliyas Jorio’s modern native port](https://github.com/jorio/Nanosaur). The original game and native modernization are their work; our additions bring the game to the browser while retaining the macOS, Windows, and Linux builds.
 
 Originally released in 1998 and bundled with the original iMac, Nanosaur casts a cybernetic dinosaur from the future who’s sent back in time 20 minutes before a giant asteroid hits the Earth.
@@ -8,7 +10,7 @@ The web port adds browser rendering and asset loading, fullscreen play, audio, a
 
 ## Build and play
 
-- **Browser:** follow the [web build and hosting instructions](BUILD.md#webassembly--webgl2).
+- **Browser:** [play online](https://niccolozuppichini.com/Nanosaur/) or follow the [web build and hosting instructions](BUILD.md#webassembly--webgl2).
 - **Native:** see [BUILD.md](BUILD.md) or download [Jorio’s upstream releases](https://github.com/jorio/Nanosaur/releases).
 
 ![Screenshot](docs/screenshot.png)
