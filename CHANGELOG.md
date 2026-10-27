@@ -6,7 +6,7 @@
 	- Added a WebAssembly/WebGL2 build with shader-based rendering, original audio and cinematics, and browser-persisted preferences and high scores.
 	- Converted screens and gameplay to frame-stepped states shared by native and browser builds.
 	- Added a Blender-rendered vintage Macintosh browser intro with a Nanosaur CRT splash, live segmented download progress, responsive screen placement, automatic game startup, optional sound/fullscreen activation, and a chrome-free, full-window view.
-	- Added explicit Pomme dependency preparation.
+	- Pinned the Pomme submodule to a fork whose `fix/reuse-existing-sdl3-target` branch lets Pomme reuse the parent project's `SDL3::SDL3` target.
 	- Added GitHub Actions web builds.
 	- Updated web CI actions for Node.js 24 and documented GitHub Pages environment protection requirements.
 	- Consolidated the web port on master and switched CI and GitHub Pages deployment to master.

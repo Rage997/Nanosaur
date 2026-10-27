@@ -477,7 +477,10 @@ if __name__ == "__main__":
     if args.dependencies:
         fatlog("Setting up dependencies")
 
-        call([sys.executable, os.path.join(root_dir, "prepare_dependencies.py")])
+        # Check that our submodules are here
+        if not os.path.exists("extern/Pomme/CMakeLists.txt"):
+            die("Submodules appear to be missing.\n"
+                + "Did you clone the submodules recursively? Try this:    git submodule update --init --recursive")
 
         project.prepare_dependencies()
 

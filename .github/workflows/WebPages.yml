@@ -30,8 +30,10 @@ jobs:
           version: '6.0.13'
           actions-cache-folder: emsdk-cache
 
-      - name: Prepare dependencies
-        run: python3 prepare_dependencies.py
+      - name: Sync submodules
+        run: |
+          git submodule sync
+          git submodule update --init --recursive
 
       - name: Configure
         run: emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release
@@ -44,6 +46,7 @@ jobs:
           mkdir -p _site
           cp build-web/Nanosaur.html _site/index.html
           cp build-web/Nanosaur.{js,wasm,data,png} _site/
+          cp build-web/LICENSE.md _site/
           cp -R build-web/web-assets _site/
 
       - name: Upload Pages artifact

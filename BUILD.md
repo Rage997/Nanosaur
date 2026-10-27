@@ -14,13 +14,7 @@ If you want to build the game **manually** instead, the rest of this document de
 
 ### Pomme dependency
 
-Pomme remains pinned to the upstream Git submodule. `python3 build.py` prepares it
-automatically during its dependencies step. For manual native or web builds, run
-`python3 prepare_dependencies.py` before configuring CMake.
-
-This explicit setup initializes the submodule and applies
-[`patches/pomme-reuse-sdl-target.patch`](patches/pomme-reuse-sdl-target.patch), allowing
-Pomme to reuse the parent project's `SDL3::SDL3` target. 
+The `extern/Pomme` submodule is pinned to [Rage997/Pomme](https://github.com/Rage997/Pomme), a fork of [jorio/Pomme](https://github.com/jorio/Pomme), whose `fix/reuse-existing-sdl3-target` branch lets Pomme reuse the parent project's `SDL3::SDL3` target. No manual patching of the submodule is required.
 
 ## How to build the game manually on macOS
 
@@ -31,7 +25,6 @@ Pomme to reuse the parent project's `SDL3::SDL3` target.
     ```
     git clone --branch master --recurse-submodules https://github.com/Rage997/Nanosaur
     cd Nanosaur
-    python3 prepare_dependencies.py
     ```
 1. Download [SDL3-3.2.8.dmg](https://libsdl.org/release/SDL3-3.2.8.dmg), open it, then browse to SDL3.xcframework/macos-arm64_x86_64. In that folder, copy **SDL3.framework** to the game's **extern** folder.
 1. Prep the Xcode project:
@@ -53,7 +46,6 @@ Pomme to reuse the parent project's `SDL3::SDL3` target.
     ```
     git clone --branch master --recurse-submodules https://github.com/Rage997/Nanosaur
     cd Nanosaur
-    python3 prepare_dependencies.py
     ```
 1. Download [SDL3-devel-3.2.8-VC.zip](https://libsdl.org/release/SDL3-devel-3.2.8-VC.zip), extract it, and copy **SDL3-3.2.8** to the **extern** folder. Rename **SDL3-3.2.8** to just **SDL3**.
 1. Prep the Visual Studio solution:
@@ -77,7 +69,6 @@ Pomme to reuse the parent project's `SDL3::SDL3` target.
     ```
     git clone --branch master --recurse-submodules https://github.com/Rage997/Nanosaur
     cd Nanosaur
-    python3 prepare_dependencies.py
     ```
 1. Build the game:
     ```
@@ -93,7 +84,7 @@ From the repository root, with [Emscripten](https://emscripten.org/docs/getting_
 installed and activated, CMake 3.21+, and Python 3:
 
 ```sh
-python3 prepare_dependencies.py
+git submodule update --init --recursive
 emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release
 cmake --build build-web -j
 python3 -m http.server 8000 --directory build-web

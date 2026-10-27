@@ -227,6 +227,7 @@ endif()
 target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
 if(EMSCRIPTEN)
 	configure_file(packaging/Nanosaur.png "${CMAKE_CURRENT_BINARY_DIR}/Nanosaur.png" COPYONLY)
+	configure_file(LICENSE.md "${CMAKE_CURRENT_BINARY_DIR}/LICENSE.md" COPYONLY)
 	foreach(WEB_ASSET mac-background.webp nanosaur-splash.png crt-mask.png)
 		configure_file("packaging/web-assets/${WEB_ASSET}"
 			"${CMAKE_CURRENT_BINARY_DIR}/web-assets/${WEB_ASSET}" COPYONLY)
